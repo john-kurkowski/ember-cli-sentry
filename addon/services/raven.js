@@ -173,7 +173,7 @@ export default Service.extend({
    */
   enableGlobalErrorCatching() {
     if (this.get('isRavenUsable') && !this.get('globalErrorCatchingInitialized')) {
-      const _oldOnError = Ember.onerror;
+      this._oldOnError = Ember.onerror;
 
       Ember.onerror = (error) => {
         if (this._ignoreError(error)) {
@@ -182,12 +182,12 @@ export default Service.extend({
 
         this.captureException(error);
         this.didCaptureException(error);
-        if (typeof(_oldOnError) === 'function') {
-          _oldOnError.call(Ember, error);
+        if (typeof(this._oldOnError) === 'function') {
+          this._oldOnError.call(Ember, error);
         }
       };
 
-      RSVP.on('error', (reason, label) => {
+      this._rsvpError = (reason, label) => {
         if (this._ignoreError(reason)) {
           return;
         }
@@ -207,7 +207,9 @@ export default Service.extend({
             }
           });
         }
-      });
+      };
+
+      RSVP.on('error', this._rsvpError);
 
       this.set('globalErrorCatchingInitialized', true);
     }
@@ -282,5 +284,12 @@ export default Service.extend({
         return false;
       }
     }
-  }
+  },
+
+  willDestroy() {
+    if (this.get('globalErrorCatchingInitialized')) {
+      Ember.onerror = this._oldOnError;
+      RSVP.off('error', this._rsvpError);
+    }
+  },
 });
